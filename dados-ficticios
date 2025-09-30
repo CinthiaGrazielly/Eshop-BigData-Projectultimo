@@ -1,0 +1,88 @@
+# generate_fake_data.py
+from pymongo import MongoClient
+import random
+import datetime
+
+client = MongoClient("mongodb://localhost:27017/")
+db = client["eshop_db"]
+
+def gerar_clientes(n=20):
+    nomes = ["Mariana Silva","João Pereira","Lucas Costa","Ana Souza","Carlos Lima","Beatriz Rocha","Felipe Alves","Julia Ramos","Ricardo Nunes","Amanda Freitas"]
+    cidades = ["São Paulo","Rio de Janeiro","Belo Horizonte","Fortaleza","Salvador","Curitiba","Porto Alegre"]
+    clientes = []
+    for i in range(n):
+        cid = f"C{1000+i}"
+        c = {
+            "customer_id": cid,
+            "nome": random.choice(nomes) + f" {random.randint(1,99)}",
+            "email": f"user{1000+i}@exemplo.com",
+            "cidade": random.choice(cidades),
+            "estado": "SP",
+            "created_at": datetime.datetime.now()
+        }
+        clientes.append(c)
+    db.clientes.insert_many(clientes)
+    print(f"Inserted {n} clientes")
+
+def gerar_produtos(m=15):
+    produtos = []
+    categorias = ["Eletrônicos","Moda","Casa","Beleza","Esporte"]
+    for i in range(m):
+        pid = f"P{2000+i}"
+        p = {
+            "product_id": pid,
+            "nome": f"Produto {i+1}",
+            "categoria": random.choice(categorias),
+            "preco": round(random.uniform(10, 2000), 2),
+            "estoque": random.randint(0, 200)
+        }
+        produtos.append(p)
+    db.produtos.insert_many(produtos)
+    print(f"Inserted {m} produtos")
+
+def gerar_pedidos(k=50):
+    clientes_ids = [c["customer_id"] for c in list(db.clientes.find({}, {"customer_id":1, "_id":0}))]
+    produtos_list = list(db.produtos.find({}, {"product_id":1, "preco":1, "_id":0}))
+    if not clientes_ids or not produtos_list:
+        print("Sem clientes ou produtos. Execute gerar_clientes e gerar_produtos primeiro.")
+        return
+
+    pedidos = []
+    for i in range(k):
+        oid = f"ORD{3000+i}"
+        cid = random.choice(clientes_ids)
+        itens = []
+        total = 0.0
+        for _ in range(random.randint(1,3)):
+            p = random.choice(produtos_list)
+            quantidade = random.randint(1,3)
+            preco = float(p["preco"])
+            itens.append({
+                "product_id": p["product_id"],
+                "quantidade": quantidade,
+                "preco_unitario": preco
+            })
+            total += quantidade * preco
+        pedido = {
+            "order_id": oid,
+            "customer_id": cid,
+            "itens": itens,
+            "total": round(total, 2),
+            "status": random.choice(["processing","shipped","delivered"]),
+            "order_date": datetime.datetime.now(),
+            "shipping_region": random.choice(["Sudeste","Nordeste","Sul","Centro-Oeste","Norte"])
+        }
+        pedidos.append(pedido)
+    db.pedidos.insert_many(pedidos)
+    print(f"Inserted {k} pedidos")
+
+if __name__ == "__main__":
+    # Limpa coleções (opcional)
+    db.clientes.delete_many({})
+    db.produtos.delete_many({})
+    db.pedidos.delete_many({})
+
+    gerar_clientes(n=30)
+    gerar_produtos(m=20)
+    gerar_pedidos(k=80)
+    print("Dados fictícios gerados com sucesso.")
